@@ -4,6 +4,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { authRoutes } from './routes/auth.routes';
 import { userRoutes } from './routes/users.routes';
+import { adminRoutes } from './routes/admin.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './lib/logger';
 
@@ -21,6 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
