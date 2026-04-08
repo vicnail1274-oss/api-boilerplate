@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { db } from '../lib/db';
+import { getDb } from '../lib/db';
 
 type SessionLookupRow = {
   session_id: string | number;
@@ -52,7 +52,7 @@ export function extractAdminSessionToken(rawCookieHeader: string | undefined, ra
 }
 
 async function runLookupQuery(query: Prisma.Sql): Promise<AdminSessionContext | null> {
-  const rows = await db.$queryRaw<SessionLookupRow[]>(query);
+  const rows = await getDb().$queryRaw<SessionLookupRow[]>(query);
   if (!rows[0]) {
     return null;
   }
