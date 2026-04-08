@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client';
 import { getDb } from '../lib/db';
 
 type SessionLookupRow = {
@@ -51,8 +50,11 @@ export function extractAdminSessionToken(rawCookieHeader: string | undefined, ra
   return readCookie(rawCookieHeader, SESSION_COOKIE_NAME);
 }
 
-async function runLookupQuery(query: Prisma.Sql): Promise<AdminSessionContext | null> {
-  const rows = await getDb().$queryRaw<SessionLookupRow[]>(query);
+async function runLookupQuery(query: string, sessionToken: string): Promise<AdminSessionContext | null> {
+  const db = getDb() as unknown as {
+    $queryRawUnsafe: (rawQuery: string, ...params: unknown[]) => Promise<SessionLookupRow[]>;
+  };
+  const rows = await db.$queryRawUnsafe(query, sessionToken);
   if (!rows[0]) {
     return null;
   }
@@ -65,21 +67,21 @@ async function runLookupQuery(query: Prisma.Sql): Promise<AdminSessionContext | 
 }
 
 export async function resolveSessionRoleFromDb(sessionToken: string): Promise<AdminSessionContext | null> {
-  const lookupQueries: Prisma.Sql[] = [
-    Prisma.sql`
+  const lookupQueries: string[] = [
+    `
       SELECT s.id AS session_id, s.user_id AS user_id, u.role AS role
       FROM admin_sessions s
       JOIN users u ON u.id = s.user_id
-      WHERE s.session_token = ${sessionToken}
+      WHERE s.session_token = $1
         AND s.revoked_at IS NULL
         AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
       LIMIT 1
     `,
-    Prisma.sql`
+    `
       SELECT s.id AS session_id, s.user_id AS user_id, u.role AS role
       FROM sessions s
       JOIN users u ON u.id = s.user_id
-      WHERE s.token = ${sessionToken}
+      WHERE s.token = $1
         AND s.revoked_at IS NULL
         AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
       LIMIT 1
@@ -89,7 +91,7 @@ export async function resolveSessionRoleFromDb(sessionToken: string): Promise<Ad
   let lastError: unknown;
   for (const query of lookupQueries) {
     try {
-      return await runLookupQuery(query);
+      return await runLookupQuery(query, sessionToken);
     } catch (error) {
       if (isSchemaMismatchError(error)) {
         lastError = error;
